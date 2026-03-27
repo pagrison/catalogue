@@ -47,7 +47,7 @@ function render(){
   listEl.innerHTML = data.map((it, idx) => {
     const imgs = Array.isArray(it.images) && it.images.length ? it.images : (it.image ? [it.image] : []);
     const mainImg = imgs[0] || '';
-    const mini = imgs.map((u) => `<img class="thumb-mini" data-target="main-${idx}" src="${escapeAttr(u)}" alt="mini" onerror="this.style.display='none'" />`).join('');
+    const mini = imgs.map((u) => `<img class="thumb-mini" data-target="main-${idx}" src="${escapeAttr(u)}" alt="mini" onerror="this.style.display='none'" onclick="var m=document.getElementById('main-${idx}'); if(m){m.src=this.src;}" />`).join('');
     return `
     <article class="card">
       <img id="main-${idx}" class="thumb" loading="lazy" src="${escapeAttr(mainImg)}" alt="${escapeAttr(it.title||'Livre')}" onerror="this.style.opacity='0.25'" />
