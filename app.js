@@ -45,13 +45,20 @@ function render(){
   const data = filterItems();
   countEl.textContent = `${data.length} résultat(s)`;
   listEl.innerHTML = data.map((it, idx) => {
-    const imgs = Array.isArray(it.images) && it.images.length ? it.images : (it.image ? [it.image] : []);
-    const mainImg = imgs[0] || '';
-    const mini = imgs.map((u) => `<img class="thumb-mini" data-target="main-${idx}" src="${escapeAttr(u)}" alt="mini" onerror="this.style.display='none'" onclick="var m=document.getElementById('main-${idx}'); if(m){m.src=this.src;}" />`).join('');
+    const rawImgs = Array.isArray(it.images) && it.images.length ? it.images : (it.image ? [it.image] : []);
+    const imgs = rawImgs.map(u => String(u || '').trim()).filter(Boolean);
+    const visibleImgs = imgs.filter(u => !u.includes('/search/no-image.gif'));
+    const gallery = visibleImgs.length ? visibleImgs : [];
+    const mainImg = gallery[0] || '';
+    const mini = gallery.map((u) => `<img class="thumb-mini" data-target="main-${idx}" src="${escapeAttr(u)}" alt="mini" onerror="this.style.display='none'" onclick="var m=document.getElementById('main-${idx}'); if(m){m.src=this.src;}" />`).join('');
+    const visual = gallery.length
+      ? `<img id="main-${idx}" class="thumb" loading="lazy" src="${escapeAttr(mainImg)}" alt="${escapeAttr(it.title||'Livre')}" onerror="this.style.display='none'; var n=this.nextElementSibling; if(n&&n.classList.contains('no-thumb')) n.style.display='flex';" /><div class="no-thumb" style="display:none">Pas d'image</div>`
+      : `<div class="no-thumb">Pas d'image</div>`;
+
     return `
     <article class="card">
-      <img id="main-${idx}" class="thumb" loading="lazy" src="${escapeAttr(mainImg)}" alt="${escapeAttr(it.title||'Livre')}" onerror="this.style.opacity='0.25'" />
-      ${imgs.length ? `<div class="more-photos">${imgs.length} photo${imgs.length > 1 ? 's' : ''}</div><div class="thumbs">${mini}</div>` : ''}
+      ${visual}
+      ${gallery.length ? `<div class="more-photos">${gallery.length} photo${gallery.length > 1 ? 's' : ''}</div><div class="thumbs">${mini}</div>` : ''}
       <h3>${escapeHtml(it.title||'Sans titre')}</h3>
       <div class="theme">${escapeHtml(it.theme||'Divers')}</div>
       <div class="meta">
