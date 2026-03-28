@@ -33,7 +33,12 @@ function filterItems(){
   const theme = themeEl.value;
 
   let out = items;
-  if(theme) out = out.filter(it => (it.theme||'') === theme);
+  if(theme) {
+    out = out.filter(it => {
+      const allThemes = Array.isArray(it.themes) ? it.themes : [it.theme].filter(Boolean);
+      return allThemes.includes(theme);
+    });
+  }
 
   if(q){
     out = out.filter(it => normalize([
