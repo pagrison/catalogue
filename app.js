@@ -33,10 +33,22 @@ function filterItems(){
   const theme = themeEl.value;
 
   let out = items;
-  if(theme) out = out.filter(it => Array.isArray(it.themes) ? it.themes.includes(theme) : (it.theme||'Divers') === theme);
+  if(theme) out = out.filter(it => (it.theme||'') === theme);
 
   if(q){
-    out = out.filter(it => normalize([it.title,it.reference,it.description,it.condition,it.theme].join(' ')).includes(q));
+    out = out.filter(it => normalize([
+      it.reference,
+      it.old_reference,
+      it.author,
+      it.title,
+      it.description,
+      it.editor,
+      it.year,
+      it.price_eur,
+      it.place,
+      it.theme,
+      ...(Array.isArray(it.themes) ? it.themes : [])
+    ].join(' ')).includes(q));
   }
   return sortItems(out);
 }
@@ -44,65 +56,34 @@ function filterItems(){
 function render(){
   const data = filterItems();
   countEl.textContent = `${data.length} résultat(s)`;
-  listEl.innerHTML = data.map((it, idx) => {
-    const rawImgs = Array.isArray(it.images) && it.images.length ? it.images : (it.image ? [it.image] : []);
-    const imgs = rawImgs.map(u => String(u || '').trim()).filter(Boolean);
-    const visibleImgs = imgs.filter(u => !u.includes('/search/no-image.gif'));
-    const gallery = visibleImgs.length ? visibleImgs : [];
-    const mainImg = gallery[0] || '';
-    const mini = gallery.map((u) => `<img class="thumb-mini" data-target="main-${idx}" src="${escapeAttr(u)}" alt="mini" onerror="this.style.display='none'" onclick="var m=document.getElementById('main-${idx}'); if(m){m.src=this.src;}" />`).join('');
-    const visual = gallery.length
-      ? `<img id="main-${idx}" class="thumb" loading="lazy" src="${escapeAttr(mainImg)}" alt="${escapeAttr(it.title||'Livre')}" onerror="this.style.display='none'; var n=this.nextElementSibling; if(n&&n.classList.contains('no-thumb')) n.style.display='flex';" /><div class="no-thumb" style="display:none">Image sur demande</div>`
-      : `<div class="no-thumb">Image sur demande</div>`;
-
+  listEl.innerHTML = data.map((it) => {
+    const allThemes = Array.isArray(it.themes) ? it.themes.filter(Boolean) : [];
+    const otherThemes = allThemes.filter(t => t !== it.theme);
     return `
     <article class="card">
-      ${visual}
-      ${gallery.length ? `<div class="more-photos">${gallery.length} photo${gallery.length > 1 ? 's' : ''}</div><div class="thumbs">${mini}</div>` : ''}
       <h3>${escapeHtml(it.title||'Sans titre')}</h3>
-      <div class="theme">${escapeHtml(it.theme||'Divers')}</div>
       <div class="meta">
-        <div><strong>Réf:</strong> ${escapeHtml(referenceOf(it))}</div>
+        <div><strong>Réf:</strong> ${escapeHtml(it.reference||'—')}</div>
+        <div><strong>Auteur:</strong> ${escapeHtml(it.author||'—')}</div>
+        <div><strong>Éditeur:</strong> ${escapeHtml(it.editor||'—')}</div>
+        <div><strong>Année:</strong> ${escapeHtml(it.year||'—')}</div>
         <div><strong>Prix:</strong> ${escapeHtml(it.price_eur||'—')} €</div>
-        <div><strong>État:</strong> ${escapeHtml(it.condition||'—')}</div>
+        <div><strong>Lieu:</strong> ${escapeHtml(it.place||'—')}</div>
+        <div><strong>Thème principal:</strong> ${escapeHtml(it.theme||'—')}</div>
+        <div><strong>Autres thèmes:</strong> ${escapeHtml(otherThemes.join(', ')||'—')}</div>
       </div>
-      <div class="desc">${escapeHtml(stripShippingNoise((it.description||'')).slice(0,420))}</div>
+      <div class="desc">${escapeHtml(it.description||'—')}</div>
     </article>
   `;
   }).join('');
 }
 
-function stripShippingNoise(text){
-  let s = String(text || '');
-
-  // Exact noisy sentence variants (including broken accents)
-  s = s.replace(/Expédition à\s*EUR\s*[0-9]+(?:[\.,][0-9]+)?\s*En savoir plus sur les tarifs d.?expédition\s*Expédition nationale\s*:\s*France\s*Quantité disponible\s*:\s*\d+\s*disponible\(s\)\s*Ajouter au panier/gi, '');
-  s = s.replace(/Expdition à\s*EUR\s*[0-9]+(?:[\.,][0-9]+)?\s*En savoir plus sur les tarifs d.?expdition\s*Expdition nationale\s*:\s*France\s*Quantit disponible\s*:\s*\d+\s*disponible\(s\)\s*Ajouter au panier/gi, '');
-
-  // More general fallback cleanup
-  s = s.replace(/Exp[^\n]{0,50}EUR\s*[0-9]+(?:[\.,][0-9]+)?[^\n]*En savoir plus[^\n]*?Ajouter au panier/gi, '');
-  s = s.replace(/En savoir plus sur les tarifs d.?exp[^\s]*dition/gi, '');
-  s = s.replace(/Exp[^\n]{0,30}dition nationale\s*:\s*France/gi, '');
-  s = s.replace(/Quantit[^\n]{0,20}disponible\s*:\s*\d+\s*disponible\(s\)/gi, '');
-  s = s.replace(/Ajouter au panier/gi, '');
-
-  return s.replace(/\s+/g, ' ').trim();
-}
-
-function referenceOf(it){
-  const ref = String(it?.reference || '').trim();
-  if (ref) return ref;
-  const m = String(it?.url || '').match(/\/(\d{6,})\/bd/);
-  return m ? m[1] : '—';
-}
-
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function escapeAttr(s){ return String(s).replace(/"/g,'&quot;'); }
 
 function initThemes(sourceThemes = null){
   const themes = (Array.isArray(sourceThemes) && sourceThemes.length)
     ? [...sourceThemes]
-    : [...new Set(items.flatMap(i => Array.isArray(i.themes) ? i.themes : [i.theme || 'Divers']))].sort((a,b)=>a.localeCompare(b,'fr'));
+    : [...new Set(items.map(i => i.theme).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
 
   themes.forEach(t => {
     const opt = document.createElement('option');
@@ -116,7 +97,7 @@ async function boot(){
   if (window.CATALOG_DATA && window.CATALOG_DATA.items) {
     const j = window.CATALOG_DATA;
     items = j.items || [];
-    metaEl.textContent = `${j.seller?.name||''} — ${j.seller?.location||''} — ${j.count||items.length} entrées extraites`;
+    metaEl.textContent = `${j.seller?.name||''} — ${j.seller?.location||''} — ${j.count||items.length} entrées`;
     initThemes(j.themes);
     render();
     return;
@@ -126,7 +107,7 @@ async function boot(){
     const r = await fetch('data/catalog.json');
     const j = await r.json();
     items = j.items || [];
-    metaEl.textContent = `${j.seller?.name||''} — ${j.seller?.location||''} — ${j.count||items.length} entrées extraites`;
+    metaEl.textContent = `${j.seller?.name||''} — ${j.seller?.location||''} — ${j.count||items.length} entrées`;
     initThemes(j.themes);
     render();
   } catch (e) {
@@ -137,13 +118,5 @@ async function boot(){
 qEl.addEventListener('input', render);
 sortEl.addEventListener('change', render);
 themeEl.addEventListener('change', render);
-
-listEl.addEventListener('click', (e) => {
-  const mini = e.target.closest('.thumb-mini');
-  if (!mini) return;
-  const targetId = mini.getAttribute('data-target');
-  const main = document.getElementById(targetId);
-  if (main) main.src = mini.src;
-});
 
 boot();
