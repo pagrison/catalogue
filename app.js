@@ -6,6 +6,8 @@ const themeEl = document.getElementById('theme');
 const listEl = document.getElementById('list');
 const countEl = document.getElementById('count');
 const metaEl = document.getElementById('meta');
+const categoriesEl = document.getElementById('categories');
+const randomEl = document.getElementById('random-picks');
 
 function numRef(r){ const n = parseInt(String(r||'').replace(/\D+/g,''),10); return Number.isFinite(n)?n:0; }
 function numPrice(p){ const n = parseFloat(String(p||'').replace(',','.')); return Number.isFinite(n)?n:Infinity; }
@@ -28,16 +30,18 @@ function normalize(s){
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+function allThemesOf(it){
+  const arr = Array.isArray(it.themes) ? it.themes : [it.theme].filter(Boolean);
+  return [...new Set(arr.filter(Boolean))];
+}
+
 function filterItems(){
   const q = normalize(qEl.value.trim());
   const theme = themeEl.value;
 
   let out = items;
   if(theme) {
-    out = out.filter(it => {
-      const allThemes = Array.isArray(it.themes) ? it.themes : [it.theme].filter(Boolean);
-      return allThemes.includes(theme);
-    });
+    out = out.filter(it => allThemesOf(it).includes(theme));
   }
 
   if(q){
@@ -51,24 +55,26 @@ function filterItems(){
       it.year,
       it.price_eur,
       it.place,
-      it.theme,
-      ...(Array.isArray(it.themes) ? it.themes : [])
+      ...allThemesOf(it)
     ].join(' ')).includes(q));
   }
   return sortItems(out);
+}
+
+function getGallery(it){
+  const rawImgs = Array.isArray(it.images) && it.images.length ? it.images : (it.image ? [it.image] : []);
+  const imgs = rawImgs.map(u => String(u || '').trim()).filter(Boolean);
+  return imgs.filter(u => !u.includes('/search/no-image.gif'));
 }
 
 function render(){
   const data = filterItems();
   countEl.textContent = `${data.length} résultat(s)`;
   listEl.innerHTML = data.map((it, idx) => {
-    const allThemes = Array.isArray(it.themes) ? it.themes.filter(Boolean) : [];
+    const allThemes = allThemesOf(it);
     const otherThemes = allThemes.filter(t => t !== it.theme);
 
-    const rawImgs = Array.isArray(it.images) && it.images.length ? it.images : (it.image ? [it.image] : []);
-    const imgs = rawImgs.map(u => String(u || '').trim()).filter(Boolean);
-    const visibleImgs = imgs.filter(u => !u.includes('/search/no-image.gif'));
-    const gallery = visibleImgs.length ? visibleImgs : [];
+    const gallery = getGallery(it);
     const mainImg = gallery[0] || '';
     const mini = gallery.map((u) => `<img class="thumb-mini" data-target="main-${idx}" src="${escapeAttr(u)}" alt="mini" onerror="this.style.display='none'" onclick="var m=document.getElementById('main-${idx}'); if(m){m.src=this.src;}" />`).join('');
     const visual = gallery.length
@@ -103,6 +109,41 @@ function render(){
   }).join('');
 }
 
+function renderHome(){
+  const counts = new Map();
+  items.forEach(it => {
+    allThemesOf(it).forEach(t => counts.set(t, (counts.get(t) || 0) + 1));
+  });
+
+  const sortedThemes = [...counts.entries()].sort((a,b)=>a[0].localeCompare(b[0], 'fr'));
+  categoriesEl.innerHTML = sortedThemes.map(([theme, count]) =>
+    `<button class="home-theme-chip" data-theme="${escapeAttr(theme)}" type="button">${escapeHtml(theme)} <span>(${count})</span></button>`
+  ).join('');
+
+  const pool = [...items];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const picks = pool.slice(0, 8);
+
+  randomEl.innerHTML = picks.map((it) => {
+    const img = getGallery(it)[0] || '';
+    const thumb = img
+      ? `<img class="pick-thumb" loading="lazy" src="${escapeAttr(img)}" alt="${escapeAttr(it.title||'Livre')}" />`
+      : `<div class="pick-no-thumb">Image sur demande</div>`;
+
+    return `
+      <article class="pick-card">
+        ${thumb}
+        <h4>${escapeHtml(it.title || 'Sans titre')}</h4>
+        <div class="pick-meta">Réf ${escapeHtml(it.reference||'—')} · ${escapeHtml(it.author||'—')}</div>
+        <button class="home-theme-chip" data-theme="${escapeAttr(it.theme||'')}" type="button">${escapeHtml(it.theme||'Sans thème')}</button>
+      </article>
+    `;
+  }).join('');
+}
+
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s){ return String(s).replace(/"/g,'&quot;'); }
 
@@ -119,12 +160,20 @@ function initThemes(sourceThemes = null){
   });
 }
 
+function selectTheme(theme){
+  if (!theme) return;
+  themeEl.value = theme;
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 async function boot(){
   if (window.CATALOG_DATA && window.CATALOG_DATA.items) {
     const j = window.CATALOG_DATA;
     items = j.items || [];
     metaEl.textContent = `${j.seller?.name||''} — ${j.seller?.location||''} — ${j.count||items.length} entrées`;
     initThemes(j.themes);
+    renderHome();
     render();
     return;
   }
@@ -135,6 +184,7 @@ async function boot(){
     items = j.items || [];
     metaEl.textContent = `${j.seller?.name||''} — ${j.seller?.location||''} — ${j.count||items.length} entrées`;
     initThemes(j.themes);
+    renderHome();
     render();
   } catch (e) {
     metaEl.textContent = 'Erreur de chargement des données.';
@@ -148,9 +198,7 @@ themeEl.addEventListener('change', render);
 listEl.addEventListener('click', (e) => {
   const chip = e.target.closest('.theme-chip');
   if (chip) {
-    const selected = chip.getAttribute('data-theme') || '';
-    themeEl.value = selected;
-    render();
+    selectTheme(chip.getAttribute('data-theme') || '');
     return;
   }
 
@@ -159,6 +207,12 @@ listEl.addEventListener('click', (e) => {
   const targetId = mini.getAttribute('data-target');
   const main = document.getElementById(targetId);
   if (main) main.src = mini.src;
+});
+
+document.addEventListener('click', (e) => {
+  const chip = e.target.closest('.home-theme-chip');
+  if (!chip) return;
+  selectTheme(chip.getAttribute('data-theme') || '');
 });
 
 boot();
