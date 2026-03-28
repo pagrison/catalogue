@@ -128,9 +128,9 @@ function renderCatalog(){
 function renderHome(){
   const counts = new Map();
   items.forEach(it => {
-    const main = String(it.theme || '').trim();
-    if (!main) return;
-    counts.set(main, (counts.get(main) || 0) + 1);
+    allThemesOf(it).forEach(t => {
+      counts.set(t, (counts.get(t) || 0) + 1);
+    });
   });
 
   const themes = [...counts.entries()]
