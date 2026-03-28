@@ -112,7 +112,9 @@ function render(){
 function renderHome(){
   const counts = new Map();
   items.forEach(it => {
-    allThemesOf(it).forEach(t => counts.set(t, (counts.get(t) || 0) + 1));
+    const main = String(it.theme || '').trim();
+    if (!main) return;
+    counts.set(main, (counts.get(main) || 0) + 1);
   });
 
   const sortedThemes = [...counts.entries()].sort((a,b)=>a[0].localeCompare(b[0], 'fr'));
@@ -125,7 +127,7 @@ function renderHome(){
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  const picks = pool.slice(0, 8);
+  const picks = pool.slice(0, 3);
 
   randomEl.innerHTML = picks.map((it) => {
     const img = getGallery(it)[0] || '';
