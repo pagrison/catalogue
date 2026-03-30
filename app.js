@@ -63,8 +63,43 @@ function majorCategoryOf(theme){
   return 'Livres anciens, rares & divers';
 }
 
+function inferMajorCategoryFromItem(it){
+  const t = normalize([
+    it?.title || '', it?.description || '', it?.author || '', it?.editor || '', it?.place || ''
+  ].join(' ')).toUpperCase();
+
+  if (/(GRAVURE|ESTAMPE|LITHOGRAPH|EAU[- ]FORTE|AQUATINTE)/.test(t)) return 'Gravures';
+  if (/(ROMAN|NOUVELLE|POEME|POESIE|THEATRE|CONTE|LITTERATURE|ENFANT|JEUNESSE)/.test(t)) return 'Littérature, jeunesse & presse';
+  if (/(HISTOIRE|REVOLUTION|EMPIRE|NAPOLEON|GUERRE|MILITAIRE|ARCHEOLOG|PREHISTOIRE|ANTIQUITE|BIOGRAPHIE)/.test(t)) return 'Histoire, archéologie & militaria';
+  if (/(REGIONAL|VOYAGE|GEOGRAPH|ATLAS|CARTE|TOURISME|PROVENCE|BOURGOGNE|FRANCHE[- ]COMTE|SUISSE|AFRIQUE|EUROPE|MARINE|AVIATION)/.test(t)) return 'Régions, géographie & voyages';
+  if (/(ART|PEINTURE|SCULPT|ARCHITECT|PHOTO|PHOTOGRAPH|CARICATURE|ILLUSTRE)/.test(t)) return 'Arts, iconographie & photographie';
+  if (/(SCIENCE|BOTANIQUE|GEOLOGIE|MATHEMATIQUES|MEDECINE|PHYSIQUE|CHIMIE|NATURE)/.test(t)) return 'Sciences, médecine & nature';
+  if (/(RELIGION|BIBLE|THEOLOG|ESOTER|ASTROLOG|YOGA|SPIRITUEL)/.test(t)) return 'Religions, ésotérisme & spiritualités';
+  if (/(MUSIQUE|SPECTACLE|THEATRE|CINEMA|HUMOUR|JEUX)/.test(t)) return 'Musique, spectacles & loisirs';
+  if (/(TECHNIQUE|INDUSTR|AGRICULTURE|METIER|COUTURE|AUTOMOBILE|IMPRIMERIE|PECHE|BRICOLAGE)/.test(t)) return 'Techniques, métiers & vie pratique';
+  if (/(CUISINE|GASTRONOM|SPORT|SCOUT|LOISIR)/.test(t)) return 'Sports, cuisine & activités';
+
+  return 'Livres anciens, rares & divers';
+}
+
 function allMajorCategoriesOf(it){
-  return [...new Set(allThemesOf(it).map(majorCategoryOf))];
+  const byTheme = allThemesOf(it).map(majorCategoryOf);
+  const cats = [...new Set(byTheme)];
+
+  // If item falls only in the broad catch-all, try reclassifying from metadata.
+  if (!cats.length || (cats.length === 1 && cats[0] === 'Livres anciens, rares & divers')) {
+    return [inferMajorCategoryFromItem(it)];
+  }
+
+  // If catch-all appears with a more precise inferred category, drop catch-all.
+  if (cats.includes('Livres anciens, rares & divers')) {
+    const inferred = inferMajorCategoryFromItem(it);
+    if (inferred !== 'Livres anciens, rares & divers') {
+      return [...new Set(cats.filter(c => c !== 'Livres anciens, rares & divers').concat(inferred))];
+    }
+  }
+
+  return cats;
 }
 
 function themeRank(it, selectedTheme){
@@ -121,7 +156,7 @@ function renderCatalog(){
       ? `<img id="main-${idx}" class="thumb" loading="lazy" src="${escapeAttr(mainImg)}" alt="${escapeAttr(it.title||'Livre')}" onerror="this.style.display='none'; var n=this.nextElementSibling; if(n&&n.classList.contains('no-thumb')) n.style.display='flex';" /><div class="no-thumb" style="display:none">Image sur demande</div>`
       : `<div class="no-thumb">Image sur demande</div>`;
 
-    const majorCategory = majorCategoryOf(it.theme || allThemesOf(it)[0] || '');
+    const majorCategory = allMajorCategoriesOf(it)[0] || 'Livres anciens, rares & divers';
     const mainThemeChip = it.theme
       ? `<button class="theme-chip" data-theme="${escapeAttr(it.theme)}" type="button">${escapeHtml(it.theme)}</button>`
       : '—';
