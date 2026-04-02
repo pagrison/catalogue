@@ -174,7 +174,7 @@ function renderCatalog(){
     return `
     <article class="card">
       ${visual}
-      ${gallery.length ? `<div class="more-photos">${gallery.length} photo${gallery.length > 1 ? 's' : ''}</div><div class="thumbs">${mini}</div>` : ''}
+      ${gallery.length ? `<div class="thumbs">${mini}</div>` : ''}
       <h3>${escapeHtml(it.title||'Sans titre')}</h3>
       <div class="meta">
         <div><strong>Réf:</strong> ${escapeHtml(it.reference||'—')}</div>
